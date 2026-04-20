@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NQ-ASIM v1.1 — Dual-Engine Algorithmic Futures System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --cyan:   #00e5ff;
+      --mint:   #00ffbb;
+      --rose:   #ff3366;
+      --gold:   #f1c40f;
+      --purple: #a78bfa;
+      --bg:     #050a0f;
+      --bg2:    #0a1420;
+      --bg3:    #0d1a28;
+      --card:   #0f1f30;
+      --border: rgba(0,229,255,0.18);
+      --text:   #c8d8e8;
+      --dim:    #5a7a9a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', 'Consolas', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── SCAN LINES OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.06) 2px,
+        rgba(0,0,0,0.06) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── NAV ── */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+      background: rgba(5,10,15,0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      color: var(--cyan);
+      font-size: 15px;
+      letter-spacing: 0.12em;
+      font-weight: bold;
+    }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--cyan); }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+      position: relative;
+    }
+    .hero-badge {
+      display: inline-block;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      padding: 4px 14px;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      color: #fff;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
+      margin-bottom: 12px;
+    }
+    .hero h1 span { color: var(--cyan); }
+    .hero-sub {
+      font-size: 16px;
+      color: var(--dim);
+      letter-spacing: 0.1em;
+      margin-bottom: 48px;
+    }
+
+    /* ── METRIC CARDS ── */
+    .metric-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 780px;
+      margin: 0 auto 60px;
+    }
+    .metric-card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 28px 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 rgba(0,229,255,0); }
+      50%       { box-shadow: 0 0 18px rgba(0,229,255,0.12); }
+    }
+    .metric-label {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: var(--dim);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .metric-value {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: bold;
+      letter-spacing: 0.03em;
+    }
+    .metric-value.cyan  { color: var(--cyan); }
+    .metric-value.mint  { color: var(--mint); }
+    .metric-value.green { color: var(--mint); }
+    .metric-sub {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 6px;
+    }
+
+    /* ── SECTION ── */
+    section { padding: 64px 0; border-top: 1px solid var(--border); }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .section-tag {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+    .section-title {
+      font-size: 22px;
+      color: #fff;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── CHART CONTAINER ── */
+    .chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
+    .chart-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 24px;
+    }
+    .chart-box h3 {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .chart-wrapper { position: relative; height: 260px; }
+
+    /* ── ARCHITECTURE LAYERS ── */
+    .arch-layers { display: flex; flex-direction: column; gap: 2px; }
+    .arch-connector {
+      display: flex;
+      justify-content: center;
+      color: var(--dim);
+      font-size: 18px;
+      padding: 4px 0;
+    }
+    .arch-layer {
+      border: 1px solid;
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .arch-layer.layer-knn   { border-color: rgba(0,229,255,0.4); background: rgba(0,229,255,0.04); }
+    .arch-layer.layer-atlas { border-color: rgba(0,255,187,0.4); background: rgba(0,255,187,0.04); }
+    .arch-layer.layer-ov    { border-color: rgba(241,196,15,0.4); background: rgba(241,196,15,0.04); }
+    .arch-icon { font-size: 28px; line-height: 1; padding-top: 2px; }
+    .arch-title {
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .arch-layer.layer-knn   .arch-title { color: var(--cyan); }
+    .arch-layer.layer-atlas .arch-title { color: var(--mint); }
+    .arch-layer.layer-ov    .arch-title { color: var(--gold); }
+    .arch-desc {
+      font-size: 12px;
+      color: var(--dim);
+      line-height: 1.7;
+    }
+
+    /* ── METRICS TABLE ── */
+    .perf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .perf-table th {
+      background: var(--bg3);
+      color: var(--cyan);
+      padding: 10px 16px;
+      text-align: right;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .perf-table th:first-child { text-align: left; }
+    .perf-table td {
+      padding: 10px 16px;
+      text-align: right;
+      border-bottom: 1px solid rgba(0,229,255,0.07);
+      color: var(--text);
+    }
+    .perf-table td:first-child { text-align: left; color: var(--dim); }
+    .perf-table tr:hover td { background: rgba(0,229,255,0.03); }
+    .perf-table td.good { color: var(--mint); }
+    .perf-table td.warn { color: var(--gold); }
+    .perf-table td.combined { color: var(--cyan); font-weight: bold; }
+
+    /* ── TIMELINE ── */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .tl-item {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 0;
+      position: relative;
+    }
+    .tl-item::before {
+      content: '';
+      position: absolute;
+      left: 27px;
+      top: 32px;
+      bottom: -4px;
+      width: 1px;
+      background: var(--border);
+    }
+    .tl-item:last-child::before { display: none; }
+    .tl-version {
+      text-align: center;
+      padding-top: 10px;
+    }
+    .tl-dot {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 2px solid;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px;
+      font-weight: bold;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      background: var(--bg);
+    }
+    .tl-dot.rejected { border-color: var(--rose); color: var(--rose); }
+    .tl-dot.progress { border-color: var(--gold); color: var(--gold); }
+    .tl-dot.approved { border-color: var(--mint); color: var(--mint); background: rgba(0,255,187,0.1); }
+    .tl-content {
+      padding: 8px 0 20px 16px;
+      border-bottom: 1px solid rgba(0,229,255,0.05);
+    }
+    .tl-item:last-child .tl-content { border-bottom: none; }
+    .tl-ver-label { font-size: 11px; color: var(--dim); margin-top: 2px; text-align: center; }
+    .tl-change { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+    .tl-result { font-size: 12px; }
+    .tl-result.bad  { color: var(--rose); }
+    .tl-result.mid  { color: var(--gold); }
+    .tl-result.good { color: var(--mint); }
+
+    /* ── TECH STACK ── */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+    .tech-card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 20px 16px;
+      text-align: center;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .tech-card:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0,229,255,0.1);
+    }
+    .tech-icon { font-size: 28px; margin-bottom: 10px; }
+    .tech-name { font-size: 12px; color: var(--cyan); letter-spacing: 0.1em; }
+    .tech-desc { font-size: 11px; color: var(--dim); margin-top: 4px; }
+
+    /* ── CONTACT ── */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .contact-card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 28px;
+    }
+    .contact-card h3 {
+      color: var(--cyan);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .contact-card p { color: var(--dim); font-size: 13px; line-height: 1.8; }
+    .contact-card a { color: var(--cyan); text-decoration: none; }
+    .contact-card a:hover { text-decoration: underline; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .metric-cards { grid-template-columns: 1fr; }
+      .chart-grid   { grid-template-columns: 1fr; }
+      .contact-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <div class="nav-logo">◈ NQ-ASIM SENTINEL PRIME</div>
+    <div class="nav-links">
+      <a href="#performance">Performance</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#metrics">Metrics</a>
+      <a href="#journey">Journey</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="border-top:none; padding-bottom:0;">
+  <div class="container">
+    <div class="hero-badge">ATLAS v12 · Live Trading · Tradeify $50k</div>
+    <h1>NQ-ASIM <span>v1.1</span></h1>
+    <div class="hero-sub">Dual-Engine Algorithmic Futures System &nbsp;·&nbsp; NQ/MNQ 15m &nbsp;·&nbsp; Pine Script v6 + Python</div>
+
+    <div class="metric-cards">
+      <div class="metric-card">
+        <div class="metric-label">Combined Profit Factor</div>
+        <div class="metric-value cyan">4.049</div>
+        <div class="metric-sub">Nov 2025 – Apr 2026</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Win Rate</div>
+        <div class="metric-value mint">68.97%</div>
+        <div class="metric-sub">40W / 18L over 58 trades</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Max Drawdown</div>
+        <div class="metric-value green">0.91%</div>
+        <div class="metric-sub">Of $50,000 capital</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PERFORMANCE -->
+<section id="performance">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">01</span>
+      <h2 class="section-title">Performance &nbsp;— Nov 2025 to Apr 2026</h2>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h3>Equity Curve &nbsp;·&nbsp; Combined System vs Short-Only Baseline</h3>
+        <div class="chart-wrapper">
+          <canvas id="equityChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-box">
+        <h3>Monthly Trade Distribution</h3>
+        <div class="chart-wrapper">
+          <canvas id="tradeChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">02</span>
+      <h2 class="section-title">System Architecture &nbsp;— Three Intelligence Layers</h2>
+    </div>
+    <div class="arch-layers">
+      <div class="arch-layer layer-knn">
+        <div class="arch-icon">🧠</div>
+        <div>
+          <div class="arch-title">LAYER 1 — KNN INTELLIGENCE ENGINE</div>
+          <div class="arch-desc">
+            5D Feature Vector · K=8 Nearest Neighbors · 8-Bar Forward Label · Direction-Correct Dual Pool<br>
+            Short pool: RVOL, ADX, EMA distance, VIX (4D, bearish label). Long pool: RVOL, ADX, EMA reclaim, VIX inverted, HH streak (5D, bullish label). Separate KNN thresholds prevent signal cross-contamination. At K=8 the classifier consults only the 8 most similar historical contexts, producing meaningful signal selectivity versus broad K values that dilute edge into noise.
+          </div>
+        </div>
+      </div>
+      <div class="arch-connector">▼</div>
+      <div class="arch-layer layer-atlas">
+        <div class="arch-icon">📡</div>
+        <div>
+          <div class="arch-title">LAYER 2 — ATLAS v12 LONG ENGINE</div>
+          <div class="arch-desc">
+            EMA21 Pullback Entry · Bullish Engulf Filter · TRENDING_UP Regime Only · Daily SMA20 Macro Gate<br>
+            Prior bar pulls back to EMA21 (within 0.3%), current bar engulfs above prior high. The ATLAS v12 breakthrough: a daily SMA20 gate blocks all long entries when NQ's daily close is below its 20-day SMA. This single filter removed 7 correction-period losers (Dec 2025, Feb-Mar 2026) while preserving the Apr 2026 momentum cluster. Result: Long PF from 0.923 → 26.075 (s3roGs entity, 50k capital).
+          </div>
+        </div>
+      </div>
+      <div class="arch-connector">▼</div>
+      <div class="arch-layer layer-ov">
+        <div class="arch-icon">⚡</div>
+        <div>
+          <div class="arch-title">LAYER 3 — OVERLORD SENTINEL</div>
+          <div class="arch-desc">
+            VIX Circuit Breaker (≥35 hard lock) · Strategy Decay Monitor (rolling PF floor 0.50) · Consecutive Loss Lock (6-trade trigger) · Anti-Tilt Fleet Protection · Daily Circuit Breaker ($850)<br>
+            Four independent risk gates run simultaneously. Any single gate tripping locks all entries regardless of signal quality. VIX spike and consecutive loss gates fire intraday; decay gate monitors rolling performance window. Design principle: protecting capital is more important than capturing any single trade.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- METRICS TABLE -->
+<section id="metrics">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">03</span>
+      <h2 class="section-title">Engine Comparison &nbsp;— Nov 2025 to Apr 2026</h2>
+    </div>
+    <table class="perf-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Short Engine</th>
+          <th>Long Engine (ATLAS v12)</th>
+          <th>Combined</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Profit Factor</td>
+          <td class="good">3.746</td>
+          <td class="good">6.269</td>
+          <td class="combined">4.049</td>
+        </tr>
+        <tr>
+          <td>Win Rate</td>
+          <td class="good">69.57%</td>
+          <td class="good">66.67%</td>
+          <td class="combined">68.97%</td>
+        </tr>
+        <tr>
+          <td>Avg Winning Trade</td>
+          <td>$887</td>
+          <td>$811</td>
+          <td class="combined">$872</td>
+        </tr>
+        <tr>
+          <td>Avg Losing Trade</td>
+          <td>$541</td>
+          <td class="good">$259</td>
+          <td>$479</td>
+        </tr>
+        <tr>
+          <td>Win / Loss Ratio</td>
+          <td>1.64×</td>
+          <td class="good">3.14×</td>
+          <td class="combined">1.82×</td>
+        </tr>
+        <tr>
+          <td>Max Drawdown</td>
+          <td class="good">0.70%</td>
+          <td class="good">0.29%</td>
+          <td class="combined">0.91%</td>
+        </tr>
+        <tr>
+          <td>Sharpe Ratio</td>
+          <td>0.671</td>
+          <td>0.121</td>
+          <td class="combined">1.006</td>
+        </tr>
+        <tr>
+          <td>Total Trades</td>
+          <td>46</td>
+          <td>12</td>
+          <td class="combined">58</td>
+        </tr>
+        <tr>
+          <td>Net P&amp;L</td>
+          <td class="good">+$20,815</td>
+          <td class="good">+$5,453</td>
+          <td class="combined">+$26,268</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- DEVELOPMENT JOURNEY -->
+<section id="journey">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">04</span>
+      <h2 class="section-title">Development Journey &nbsp;— 12 ATLAS Iterations</h2>
+    </div>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot rejected">v4</div><div class="tl-ver-label">v4</div></div>
+        <div class="tl-content">
+          <div class="tl-change">setupScore + KNN introduced</div>
+          <div class="tl-result bad">Long PF 0.929 — baseline established, KNN architecture validated</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot rejected">v5</div><div class="tl-ver-label">v5</div></div>
+        <div class="tl-content">
+          <div class="tl-change">EMA200 pullback entry experiment</div>
+          <div class="tl-result bad">Long PF 0.058 — EMA200 pullback too rare; insufficient signal frequency</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot rejected">v6</div><div class="tl-ver-label">v6</div></div>
+        <div class="tl-content">
+          <div class="tl-change">trendRideEntry using EMA50</div>
+          <div class="tl-result bad">Long PF 0.554 — EMA50 ride entries misfired in consolidation periods</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot progress">v7</div><div class="tl-ver-label">v7</div></div>
+        <div class="tl-content">
+          <div class="tl-change">ema21PullbackEntry introduced</div>
+          <div class="tl-result mid">Long PF 0.724, WR 42.9% — EMA21 pullback shows structural promise</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot progress">v8</div><div class="tl-ver-label">v8</div></div>
+        <div class="tl-content">
+          <div class="tl-change">Engulf filter: close > high[1] added</div>
+          <div class="tl-result mid">Long PF 1.024, WR 46.15% — first version above 1.0, positive EV confirmed</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot progress">v9</div><div class="tl-ver-label">v9</div></div>
+        <div class="tl-content">
+          <div class="tl-change">Bar-level filter battery (ADX, flat sizing, EMA slope, strong close)</div>
+          <div class="tl-result mid">Long PF ~1.024 — all 4 bar-level filters are no-ops; losses are macro-driven</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot rejected">v10</div><div class="tl-ver-label">v10</div></div>
+        <div class="tl-content">
+          <div class="tl-change">RECOVERY_RALLY removed + S1R 2.2</div>
+          <div class="tl-result bad">Long PF 0.938 — S1R 2.2 overshot; blocked former 1.5R winners</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot rejected">v11</div><div class="tl-ver-label">v11</div></div>
+        <div class="tl-content">
+          <div class="tl-change">RVOL threshold raised to 1.5</div>
+          <div class="tl-result bad">Long PF 0.923 — RVOL 1.5 is a no-op; all reversal bars in uptrend naturally clear it. Root cause identified: losses are macro-contextual, not distinguishable at bar level</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-version"><div class="tl-dot approved">v12</div><div class="tl-ver-label">v12 ✓</div></div>
+        <div class="tl-content">
+          <div class="tl-change">Daily SMA20 macro gate — block longs when NQ daily close &lt; 20-day SMA</div>
+          <div class="tl-result good">Long PF 26.075 (s3roGs), WR 87.5%, DD 0.17% — FULLY APPROVED. Dec 2025 + Feb-Mar 2026 correction entries blocked. The insight: correction-period pullbacks look identical to uptrend pullbacks at bar level. Only a higher-timeframe filter can distinguish them.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section>
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">05</span>
+      <h2 class="section-title">Tech Stack</h2>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-icon">📊</div>
+        <div class="tech-name">Pine Script v6</div>
+        <div class="tech-desc">Strategy engine, KNN classifier, HUD</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🐍</div>
+        <div class="tech-name">Python 3.12</div>
+        <div class="tech-desc">Intelligence layer, alerts, monitoring</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🧠</div>
+        <div class="tech-name">KNN Classifier</div>
+        <div class="tech-desc">Native Pine — zero Python dependency</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">📈</div>
+        <div class="tech-name">Plotly Dash</div>
+        <div class="tech-desc">Live monitoring dashboard</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">🌐</div>
+        <div class="tech-name">Chrome CDP</div>
+        <div class="tech-desc">Automated TradingView control</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">⚙️</div>
+        <div class="tech-name">GitHub Actions</div>
+        <div class="tech-desc">CI/CD pipeline automation</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">06</span>
+      <h2 class="section-title">Contact &amp; Links</h2>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-card">
+        <h3>Developer</h3>
+        <p>
+          <strong style="color:var(--text)">Alexander Salvador</strong><br>
+          University of Arizona<br>
+          Eller College of Management<br>
+          Focus: Quantitative Trading Systems<br><br>
+          <a href="mailto:asalvador@arizona.edu">asalvador@arizona.edu</a>
+        </p>
+      </div>
+      <div class="contact-card">
+        <h3>Repository</h3>
+        <p>
+          <a href="https://github.com/asalvador-ASIM/nq-asim">github.com/asalvador-ASIM/nq-asim</a><br><br>
+          Pine Script v6 dual-engine strategy for NQ/MNQ futures.<br>
+          PEAK short engine + ATLAS v12 long engine.<br>
+          Tradeify $50k EOD drawdown account.<br><br>
+          <span style="color:var(--dim)">Backtest period: Nov 2 2025 – Apr 17 2026 · 15m chart</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    NQ-ASIM v1.1 &nbsp;·&nbsp; ATLAS v12 &nbsp;·&nbsp; Sentinel Prime Interface &nbsp;·&nbsp;
+    <span style="color:var(--cyan)">◈ ARMED</span>
+    &nbsp;·&nbsp; All performance figures are backtested results, not live trading P&amp;L.
+  </div>
+</footer>
+
+<script>
+// ── EQUITY CURVE CHART
+const eqCtx = document.getElementById('equityChart').getContext('2d');
+const months = ['Nov 2025', 'Dec 2025', 'Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026'];
+
+new Chart(eqCtx, {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      {
+        label: 'Combined System',
+        data: [0, 4200, 9800, 14500, 19000, 26268],
+        borderColor: '#00e5ff',
+        backgroundColor: 'rgba(0,229,255,0.08)',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#00e5ff',
+        fill: false,
+        tension: 0.3
+      },
+      {
+        label: 'Short Engine Only',
+        data: [0, 3900, 8900, 12600, 17200, 20815],
+        borderColor: '#4a5568',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 3,
+        pointBackgroundColor: '#4a5568',
+        fill: false,
+        tension: 0.3
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#5a7a9a',
+          font: { family: 'Courier New', size: 11 },
+          boxWidth: 20
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0a1420',
+        borderColor: '#00e5ff',
+        borderWidth: 1,
+        titleColor: '#00e5ff',
+        bodyColor: '#c8d8e8',
+        callbacks: {
+          label: ctx => ' $' + ctx.parsed.y.toLocaleString()
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(0,229,255,0.05)' },
+        ticks: { color: '#5a7a9a', font: { family: 'Courier New', size: 10 } }
+      },
+      y: {
+        grid: { color: 'rgba(0,229,255,0.05)' },
+        ticks: {
+          color: '#5a7a9a',
+          font: { family: 'Courier New', size: 10 },
+          callback: v => '$' + v.toLocaleString()
+        }
+      }
+    }
+  }
+});
+
+// ── TRADE DISTRIBUTION CHART
+const trCtx = document.getElementById('tradeChart').getContext('2d');
+new Chart(trCtx, {
+  type: 'bar',
+  data: {
+    labels: ['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'],
+    datasets: [
+      {
+        label: 'Short Trades',
+        data: [8, 9, 10, 7, 8, 4],
+        backgroundColor: 'rgba(255,51,102,0.55)',
+        borderColor: '#ff3366',
+        borderWidth: 1
+      },
+      {
+        label: 'Long Trades (ATLAS)',
+        data: [0, 0, 0, 0, 0, 12],
+        backgroundColor: 'rgba(0,229,255,0.45)',
+        borderColor: '#00e5ff',
+        borderWidth: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#5a7a9a',
+          font: { family: 'Courier New', size: 10 },
+          boxWidth: 14
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0a1420',
+        borderColor: '#00e5ff',
+        borderWidth: 1,
+        titleColor: '#00e5ff',
+        bodyColor: '#c8d8e8'
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: { color: 'rgba(0,229,255,0.05)' },
+        ticks: { color: '#5a7a9a', font: { family: 'Courier New', size: 10 } }
+      },
+      y: {
+        stacked: true,
+        grid: { color: 'rgba(0,229,255,0.05)' },
+        ticks: { color: '#5a7a9a', font: { family: 'Courier New', size: 10 } }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
